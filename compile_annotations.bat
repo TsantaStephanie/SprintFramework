@@ -4,12 +4,22 @@ echo Compilation des annotations et du test...
 REM Créer les répertoires de build s'ils n'existent pas
 if not exist "build\classes" mkdir "build\classes"
 
-REM Compilation des annotations
-echo Compilation des annotations...
-javac -d "build\classes" framework\annotation\*.java
+REM Compilation des annotations Controller (types @Controller)
+echo Compilation des annotations Controller...
+javac -d "build\classes" framework\controller\*.java
 
 if errorlevel 1 (
-    echo Erreur de compilation des annotations!
+    echo Erreur de compilation des annotations Controller!
+    pause
+    exit /b 1
+)
+
+REM Compilation des utilitaires d'annotations (GetMapping, AnnotationReader, etc.)
+echo Compilation des utilitaires d'annotations...
+javac -classpath "build\classes" -d "build\classes" framework\annotation\*.java
+
+if errorlevel 1 (
+    echo Erreur de compilation des utilitaires d'annotations!
     pause
     exit /b 1
 )

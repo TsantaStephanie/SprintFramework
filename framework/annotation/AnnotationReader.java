@@ -1,6 +1,10 @@
 package framework.annotation;
 
 import java.lang.reflect.Method;
+import java.io.IOException;
+import java.util.Set;
+
+import framework.controller.Controller;
 
 public class AnnotationReader {
     
@@ -14,5 +18,9 @@ public class AnnotationReader {
                 System.out.println("URL trouvée: " + url);
             }
         }
+    }
+
+    public static Set<Class<?>> findControllers(String basePackage) throws IOException {
+        return ClassScanner.findClassesWithAnnotation(basePackage, Controller.class);
     }
 }
