@@ -16,15 +16,23 @@ public class ResourceFilter implements Filter {
         String contextPath = httpRequest.getContextPath();
         String resourcePath = requestURI.substring(contextPath.length());
         
+        System.out.println("ResourceFilter - URI: " + requestURI + ", ResourcePath: " + resourcePath);
+        
         // Ignorer les URLs de servlets spécifiques (comme /testUrl)
         if (resourcePath.startsWith("/testUrl")) {
             chain.doFilter(request, response);
             return;
         }
         
+        // LAISSER PASSER les fichiers statiques (HTML, CSS, JS, images)
+        if (isStaticResource(resourcePath)) {
+            chain.doFilter(request, response);
+            return;
+        }
+        
+        // Pour la racine "/", servir index.html directement
         if (resourcePath.equals("/") || resourcePath.isEmpty()) {
-            request.setAttribute("originalURI", requestURI);
-            RequestDispatcher dispatcher = request.getRequestDispatcher("/FrontServlet");
+            RequestDispatcher dispatcher = request.getRequestDispatcher("/testFramework/index.html");
             dispatcher.forward(request, response);
             return;
         }
@@ -40,5 +48,12 @@ public class ResourceFilter implements Filter {
             RequestDispatcher dispatcher = request.getRequestDispatcher("/FrontServlet");
             dispatcher.forward(request, response);
         }
+    }
+    
+    /**
+     * Vérifie si la ressource est un fichier statique qui doit être servi directement
+     */
+    private boolean isStaticResource(String path) {
+        return path.endsWith(".html");
     }
 }
