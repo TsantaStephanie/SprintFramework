@@ -4,8 +4,13 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.Arrays;
 import java.util.Map;
 
+import org.apache.commons.beanutils.ConvertUtils;
+
+import annotations.Param;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -48,13 +53,14 @@ public class ResponseHandler {
             Method m = cm.method;
             m.setAccessible(true);
 
+            Object[] args = getMatchedParams(m, req);
             Class<?> returnType = m.getReturnType();
             Object objectController = c.getDeclaredConstructor().newInstance();
             if(returnType.equals(String.class)) {
                 res.setContentType("text/plain");
-                responseBody = m.invoke(objectController).toString();
-            } else if(returnType.equals(ModelAndView.class)){
-                ModelAndView mv = (ModelAndView)m.invoke(objectController);
+                responseBody = m.invoke(objectController, args).toString();
+            } else if(returnType.equals(ModelAndView.class)) {
+                ModelAndView mv = (ModelAndView)m.invoke(objectController, args);
                 Map<String, Object> data = mv.getData();
                 if(data != null) {
                     for (Map.Entry<String, Object> entry : data.entrySet()) {
@@ -73,6 +79,39 @@ public class ResponseHandler {
         } catch (ServletException | IOException ex) { // From requestDispatcher.forward()
             handleError(res, "Error forwarding to view: " + ex.getMessage());
         }
+    }
+
+    private Object[] getMatchedParams(Method method, HttpServletRequest req) {
+        Parameter[] parameters = method.getParameters();
+        Object[] args = new Object[parameters.length];
+
+        Map<String, String[]> paramsViaVue = req.getParameterMap();
+        paramsViaVue.forEach((key, value) ->
+            System.out.println(key + " => " + Arrays.toString(value))
+        );
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter p = parameters[i];
+
+            String paramName;
+            Param annotation = p.getAnnotation(Param.class);
+            if(annotation != null) {
+                paramName = annotation.value();
+            } else {
+                paramName = p.getName();
+            }
+            System.out.println("PARAMNAME---- "+paramName);
+
+            if(paramsViaVue.containsKey(paramName)) {
+                String value = paramsViaVue.get(paramName)[0];
+                Class<?> typeArg = p.getType();
+
+                Object convertedValue = ConvertUtils.convert(value, typeArg);
+                args[i] = convertedValue;
+            } else {
+                args[i] = null;
+            }
+        }
+        return args;
     }
 
     private void handleError(HttpServletResponse res, String error) {
