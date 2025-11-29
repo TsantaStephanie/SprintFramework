@@ -29,6 +29,9 @@ javac -classpath "build\classes" -d "build\classes" framework\annotation\Annotat
 REM Compiler ModelView AVANT FrontServlet
 javac -classpath "build\classes" -d "build\classes" framework\model\ModelView.java
 
+REM Compiler les controllers
+javac -classpath "jakarta.servlet-api_5.0.0.jar;build\classes" -d "build\classes" framework\controller\HomeController.java
+
 REM Compiler les servlets
 echo Compilation des servlets...
 javac -classpath "jakarta.servlet-api_5.0.0.jar;build\classes" -d "build\classes" framework\servlet\FrontServlet.java

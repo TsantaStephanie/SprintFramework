@@ -30,9 +30,11 @@ public class ResourceFilter implements Filter {
             return;
         }
         
-        // Pour la racine "/", servir index.html directement
+        // Pour la racine "/", rediriger logiquement vers /home via FrontServlet
         if (resourcePath.equals("/") || resourcePath.isEmpty()) {
-            RequestDispatcher dispatcher = request.getRequestDispatcher("/testFramework/index.html");
+            // on force une URL logique "/home" que FrontServlet utilisera
+            request.setAttribute("originalURI", contextPath + "/home");
+            RequestDispatcher dispatcher = request.getRequestDispatcher("/FrontServlet");
             dispatcher.forward(request, response);
             return;
         }
@@ -54,6 +56,6 @@ public class ResourceFilter implements Filter {
      * Vérifie si la ressource est un fichier statique qui doit être servi directement
      */
     private boolean isStaticResource(String path) {
-        return path.endsWith(".html");
+        return path.endsWith(".jsp");
     }
 }
