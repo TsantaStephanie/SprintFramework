@@ -174,12 +174,13 @@ private Object[] getMatchedParams(Method method, HttpServletRequest req) {
     }
 
     private String formattedHtmlResponseBody(String title, String body) {
-        return """
-            <html>
-                <head><title>%s</title></head>
-                <body>
-                    %s
-                </body>
-            </html>""".formatted(title, body);
-    }
+    return String.format(
+        "<!DOCTYPE html>" +
+        "<html>" +
+        "   <head><title>%s</title></head>" +
+        "   <body>%s</body>" +
+        "</html>", 
+        title, body
+    );
+}
 }
