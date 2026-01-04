@@ -57,11 +57,15 @@ public class ResponseHandler {
             Object[] args = getMatchedParams(m, req);
             Class<?> returnType = m.getReturnType();
             Object objectController = c.getDeclaredConstructor().newInstance();
+            Object result = m.invoke(objectController, args);
+            
             if(returnType.equals(String.class)) {
+                // Si le retour est une chaîne, on la retourne telle quelle
                 res.setContentType("text/plain");
-                responseBody = m.invoke(objectController, args).toString();
+                responseBody = result.toString();
             } else if(returnType.equals(ModelAndView.class)){
-                ModelAndView mv = (ModelAndView)m.invoke(objectController, args);
+                // Si c'est un ModelAndView, on traite les données et on forward vers la vue
+                ModelAndView mv = (ModelAndView)result;
                 Map<String, Object> data = mv.getData();
                 if(data != null) {
                     for (Map.Entry<String, Object> entry : data.entrySet()) {
@@ -71,8 +75,19 @@ public class ResponseHandler {
                 String view = mv.getView();
                 RequestDispatcher requestDispatcher = context.getRequestDispatcher(view);
                 requestDispatcher.forward(req, res);
+            } else if (result instanceof Map) {
+                // Si c'est une Map, on l'ajoute aux paramètres de la requête
+                Map<?, ?> resultMap = (Map<?, ?>) result;
+                for (Map.Entry<?, ?> entry : resultMap.entrySet()) {
+                    if (entry.getKey() != null && entry.getValue() != null) {
+                        req.setAttribute(entry.getKey().toString(), entry.getValue());
+                    }
+                }
+                // On peut rediriger vers une vue par défaut ou retourner un message
+                responseBody = "Données traitées avec succès";
             } else {
-                m.invoke(objectController);
+                // Pour tout autre type, on appelle simplement la méthode
+                responseBody = result != null ? result.toString() : "";
             }
         } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalArgumentException | InvocationTargetException | IllegalAccessException ex) {
             // TODO: handle exception
