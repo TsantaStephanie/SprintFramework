@@ -8,10 +8,15 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Map;
 
+import com.google.gson.Gson;
 import org.apache.commons.beanutils.ConvertUtils;
 
+// Annotations personnalisées
 import annotations.Param;
 import annotations.PathVariable;
+
+// Classes du projet
+import util.http.ModelAndView;
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
@@ -59,15 +64,60 @@ public class ResponseHandler {
             Object objectController = c.getDeclaredConstructor().newInstance();
             Object result = m.invoke(objectController, args);
             
-            if(returnType.equals(String.class)) {
-                // Si le retour est une chaîne, on la retourne telle quelle
+            // Vérifier si la réponse doit être en JSON (basé sur l'en-tête Accept ou l'extension .json)
+            boolean returnJson = req.getHeader("Accept") != null && 
+                              (req.getHeader("Accept").contains("application/json") || 
+                               req.getRequestURI().endsWith(".json"));
+            
+            if (returnJson || !returnType.equals(String.class) && !returnType.equals(ModelAndView.class)) {
+                // Si c'est une requête API ou un type autre que String/ModelAndView, on renvoie du JSON
+                res.setContentType("application/json");
+                res.setCharacterEncoding("UTF-8");
+                
+                Gson gson = new Gson();
+                
+                // Si le résultat est déjà une ApiResponse, on l'utilise directement
+                if (result instanceof ApiResponse) {
+                    responseBody = gson.toJson(result);
+                } 
+                // Si c'est une Map, on la met dans une réponse API standard
+                else if (result instanceof Map) {
+                    ApiResponse apiResponse = ApiResponse.success(result);
+                    responseBody = gson.toJson(apiResponse);
+                }
+                // Pour les autres types d'objets
+                else if (result != null) {
+                    // Si l'objet a une méthode toJson(), on l'utilise
+                    try {
+                        Method toJsonMethod = result.getClass().getMethod("toJson");
+                        if (toJsonMethod != null && toJsonMethod.getReturnType().equals(String.class)) {
+                            responseBody = (String) toJsonMethod.invoke(result);
+                        }
+                    } catch (NoSuchMethodException e) {
+                        // Si pas de méthode toJson(), on sérialise l'objet directement
+                        ApiResponse apiResponse = ApiResponse.success(result);
+                        responseBody = gson.toJson(apiResponse);
+                    }
+                } else {
+                    // Réponse vide
+                    responseBody = gson.toJson(ApiResponse.success(null));
+                }
+                
+                // Ajout du code de statut HTTP si disponible
+                if (result instanceof ApiResponse) {
+                    res.setStatus(((ApiResponse) result).getCode());
+                }
+            } 
+            // Si c'est une chaîne, on la retourne telle quelle
+            else if (returnType.equals(String.class)) {
                 res.setContentType("text/plain");
                 responseBody = result.toString();
-            } else if(returnType.equals(ModelAndView.class)){
-                // Si c'est un ModelAndView, on traite les données et on forward vers la vue
-                ModelAndView mv = (ModelAndView)result;
+            } 
+            // Si c'est un ModelAndView, on traite les données et on forward vers la vue
+            else if (returnType.equals(ModelAndView.class)) {
+                ModelAndView mv = (ModelAndView) result;
                 Map<String, Object> data = mv.getData();
-                if(data != null) {
+                if (data != null) {
                     for (Map.Entry<String, Object> entry : data.entrySet()) {
                         req.setAttribute(entry.getKey(), entry.getValue());
                     }
@@ -75,19 +125,6 @@ public class ResponseHandler {
                 String view = mv.getView();
                 RequestDispatcher requestDispatcher = context.getRequestDispatcher(view);
                 requestDispatcher.forward(req, res);
-            } else if (result instanceof Map) {
-                // Si c'est une Map, on l'ajoute aux paramètres de la requête
-                Map<?, ?> resultMap = (Map<?, ?>) result;
-                for (Map.Entry<?, ?> entry : resultMap.entrySet()) {
-                    if (entry.getKey() != null && entry.getValue() != null) {
-                        req.setAttribute(entry.getKey().toString(), entry.getValue());
-                    }
-                }
-                // On peut rediriger vers une vue par défaut ou retourner un message
-                responseBody = "Données traitées avec succès";
-            } else {
-                // Pour tout autre type, on appelle simplement la méthode
-                responseBody = result != null ? result.toString() : "";
             }
         } catch (NoSuchMethodException | SecurityException | InstantiationException | IllegalArgumentException | InvocationTargetException | IllegalAccessException ex) {
             // TODO: handle exception
