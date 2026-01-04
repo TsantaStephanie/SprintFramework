@@ -51,12 +51,22 @@ public class FrontServlet extends HttpServlet {
 
     private void customServe(HttpServletRequest req, HttpServletResponse res) throws IOException {
         String pathUrl = req.getRequestURI().substring(req.getContextPath().length());
+        String httpMethod = req.getMethod(); // GET, POST, PUT, DELETE, etc.
 
-        ClassMethod c = classMethod.get(pathUrl);
-        if(c != null) {
+        // Vérifier d'abord la correspondance exacte avec la méthode HTTP
+        String pathWithMethod = httpMethod + ":" + pathUrl;
+        ClassMethod c = classMethod.get(pathWithMethod);
+        
+        if (c != null) {
             new ResponseHandler(getServletContext()).handleResponse(c, req, res);
         } else {
-            verifyingUrl(pathUrl, req, res);
+            // Si aucune méthode spécifique n'est trouvée, vérifier les routes sans méthode spécifiée
+            c = classMethod.get(pathUrl);
+            if (c != null) {
+                new ResponseHandler(getServletContext()).handleResponse(c, req, res);
+            } else {
+                verifyingUrl(pathUrl, req, res, httpMethod);
+            }
         }
     }
 
@@ -64,25 +74,37 @@ public class FrontServlet extends HttpServlet {
         defaultDispatcher.forward(req, res);
     }
 
-    // Fonction qui verifie s'il existe un accolade dans les url d'une classe
-    private void verifyingUrl(String pathUrl, HttpServletRequest req, HttpServletResponse res) throws IOException {
+    // Fonction qui vérifie s'il existe une URL avec des paramètres dans le chemin
+    private void verifyingUrl(String pathUrl, HttpServletRequest req, HttpServletResponse res, String httpMethod) throws IOException {
         for (Map.Entry<String, ClassMethod> entry : classMethod.entrySet()) {
             String pathInController = entry.getKey();
-            if(pathInController.contains("{")) {
-                // On construit un regex
-                String regex = pathInController
+            
+            // Vérifier si le chemin contient des paramètres (entre accolades)
+            if (pathInController.contains("{")) {
+                // Extraire le chemin de base (sans la méthode HTTP si elle est présente)
+                String basePath = pathInController;
+                if (pathInController.contains(":")) {
+                    basePath = pathInController.substring(pathInController.indexOf(':') + 1);
+                }
+                
+                // Construire une expression régulière pour faire correspondre l'URL
+                String regex = basePath
                     .replace("{", "(?<")
-                    .replace("}", ">[^/]+)")   // capture group
+                    .replace("}", ">[^/]+)")   // groupe de capture
                     .replace("/", "\\/");
 
                 regex = "^" + regex + "$";
-                System.out.println(regex);
+                System.out.println("Matching URL: " + pathUrl + " against pattern: " + regex);
 
-                if(pathUrl.matches(regex)) {
-                    ClassMethod cm = classMethod.get(pathInController);
-                    req.setAttribute("matchedRoute", pathInController);
-                    new ResponseHandler(getServletContext()).handleResponse(cm, req, res);
-                    return;
+                // Vérifier si l'URL correspond au motif
+                if (pathUrl.matches(regex)) {
+                    // Vérifier si la méthode HTTP correspond
+                    if (pathInController.startsWith(httpMethod + ":") || !pathInController.contains(":")) {
+                        ClassMethod cm = classMethod.get(pathInController);
+                        req.setAttribute("matchedRoute", basePath);
+                        new ResponseHandler(getServletContext()).handleResponse(cm, req, res);
+                        return;
+                    }
                 }
             }
         }
